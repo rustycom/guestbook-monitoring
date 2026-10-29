@@ -7,6 +7,7 @@ import { createServiceMonitors } from "./src/servicemonitors";
 import { createEdge } from "./src/edge";
 import { createLoadgen } from "./src/loadgen";
 import { createDashboards } from "./src/dashboards";
+import { createAlerts } from "./src/alerts";
 
 const provider = createProvider(config);
 const guestbook = createGuestbook({ provider, config });
@@ -15,6 +16,7 @@ createServiceMonitors({ provider, namespace: guestbook.namespace, dependsOn: [mo
 const edge = createEdge({
     provider, config, guestbookNamespace: guestbook.namespace, dependsOn: [monitoring.release],
 });
+createAlerts({ provider, namespace: guestbook.namespace, dependsOn: [monitoring.release] });
 createDashboards({ provider, namespace: monitoring.namespace });
 createLoadgen({ provider, config, namespace: guestbook.namespace, dependsOn: [edge.release] });
 
