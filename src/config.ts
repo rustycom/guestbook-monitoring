@@ -24,6 +24,8 @@ export const config = {
             "pulumi/guestbook-php-redis@sha256:f21cbff35c0bad29d0c480f741e19919fb135d7c7941b8b5fc7240503d0a1c4f",
         // Leader and replica share one pinned image (see README "Upstream issue found").
         redis: "redis:8.10.3",
+        apacheExporter: "lusotycoon/apache-exporter:v1.1.1",
+        redisExporter: "oliver006/redis_exporter:v1.96.0",
     },
     charts: {
         kubePrometheusStack: {

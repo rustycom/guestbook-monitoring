@@ -8,6 +8,18 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
     const { provider, config: cfg } = args;
     const opts = { provider };
 
+    // Sidecar exporters: tiny footprint, readiness gated on the exporter answering /metrics.
+    const exporterResources = { requests: { cpu: "10m", memory: "16Mi" }, limits: { cpu: "50m", memory: "64Mi" } };
+    const metricsProbe = (port: number) => ({ httpGet: { path: "/metrics", port } });
+    const redisExporter = {
+        name: "redis-exporter",
+        image: cfg.images.redisExporter,
+        env: [{ name: "REDIS_ADDR", value: "redis://localhost:6379" }],
+        ports: [{ name: "metrics", containerPort: 9121 }],
+        resources: exporterResources,
+        readinessProbe: metricsProbe(9121),
+    };
+
     const ns = new k8s.core.v1.Namespace("guestbook", { metadata: { name: "guestbook" } }, opts);
     const namespace = ns.metadata.name;
 
@@ -30,6 +42,7 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
                             resources: { requests: { cpu: "100m", memory: "100Mi" } },
                             ports: [{ containerPort: 6379 }],
                         },
+                        redisExporter,
                     ],
                 },
             },
@@ -42,7 +55,10 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
             labels: redisLeaderLabels,
         },
         spec: {
-            ports: [{ port: 6379, targetPort: 6379 }],
+            ports: [
+                { name: "redis", port: 6379, targetPort: 6379 },
+                { name: "metrics", port: 9121, targetPort: "metrics" },
+            ],
             selector: redisLeaderLabels,
         },
     }, opts);
@@ -70,6 +86,7 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
                             resources: { requests: { cpu: "100m", memory: "100Mi" } },
                             ports: [{ containerPort: 6379 }],
                         },
+                        redisExporter,
                     ],
                 },
             },
@@ -82,7 +99,10 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
             labels: redisReplicaLabels,
         },
         spec: {
-            ports: [{ port: 6379, targetPort: 6379 }],
+            ports: [
+                { name: "redis", port: 6379, targetPort: 6379 },
+                { name: "metrics", port: 9121, targetPort: "metrics" },
+            ],
             selector: redisReplicaLabels,
         },
     }, opts);
@@ -110,6 +130,16 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
                             env: [{ name: "GET_HOSTS_FROM", value: "dns" /* value: "env"*/ }],
                             ports: [{ containerPort: 80 }],
                         },
+                        {
+                            // Reads mod_status, which the image already enables with `Require local`;
+                            // as a sidecar it reaches it over localhost, so the page stays private.
+                            name: "apache-exporter",
+                            image: cfg.images.apacheExporter,
+                            args: ["--scrape_uri=http://localhost/server-status?auto"],
+                            ports: [{ name: "metrics", containerPort: 9117 }],
+                            resources: exporterResources,
+                            readinessProbe: metricsProbe(9117),
+                        },
                     ],
                 },
             },
@@ -123,7 +153,10 @@ export function createGuestbook(args: { provider: k8s.Provider; config: Config }
         },
         spec: {
             type: cfg.frontendServiceType,
-            ports: [{ port: 80 }],
+            ports: [
+                { name: "http", port: 80, targetPort: 80 },
+                { name: "metrics", port: 9117, targetPort: "metrics" },
+            ],
             selector: frontendLabels,
         },
     }, opts);

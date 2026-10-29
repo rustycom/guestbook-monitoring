@@ -3,10 +3,12 @@ import { config } from "./src/config";
 import { createProvider } from "./src/provider";
 import { createGuestbook } from "./src/guestbook";
 import { createMonitoring } from "./src/monitoring";
+import { createServiceMonitors } from "./src/servicemonitors";
 
 const provider = createProvider(config);
 const guestbook = createGuestbook({ provider, config });
 const monitoring = createMonitoring({ provider, config });
+createServiceMonitors({ provider, namespace: guestbook.namespace, dependsOn: [monitoring.release] });
 
 export const frontendClusterIp = guestbook.frontendService.spec.clusterIP;
 export const grafanaUrl = monitoring.grafanaUrl;
