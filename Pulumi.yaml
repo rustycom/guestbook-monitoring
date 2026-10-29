@@ -13,3 +13,15 @@ config:
     type: string
     description: Service type of the guestbook frontend (traffic enters via Traefik, so ClusterIP).
     default: ClusterIP
+  exposeAs:
+    type: string
+    description: How Grafana and the Traefik edge are exposed - NodePort (kind) or LoadBalancer (cloud).
+    default: NodePort
+  nodeHost:
+    type: string
+    description: Host used to build NodePort URLs in stack outputs.
+    default: localhost
+  skipLbAwait:
+    type: boolean
+    description: With exposeAs=LoadBalancer, don't wait for an external address (useful on kind).
+    default: false
