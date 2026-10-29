@@ -6,6 +6,7 @@ import { createMonitoring } from "./src/monitoring";
 import { createServiceMonitors } from "./src/servicemonitors";
 import { createEdge } from "./src/edge";
 import { createLoadgen } from "./src/loadgen";
+import { createDashboards } from "./src/dashboards";
 
 const provider = createProvider(config);
 const guestbook = createGuestbook({ provider, config });
@@ -14,12 +15,14 @@ createServiceMonitors({ provider, namespace: guestbook.namespace, dependsOn: [mo
 const edge = createEdge({
     provider, config, guestbookNamespace: guestbook.namespace, dependsOn: [monitoring.release],
 });
+createDashboards({ provider, namespace: monitoring.namespace });
 createLoadgen({ provider, config, namespace: guestbook.namespace, dependsOn: [edge.release] });
 
 export const guestbookUrl = edge.guestbookUrl;
 
 export const frontendClusterIp = guestbook.frontendService.spec.clusterIP;
 export const grafanaUrl = monitoring.grafanaUrl;
+export const grafanaDashboardUrl = monitoring.grafanaUrl.apply(u => `${u}/d/guestbook-overview`);
 export const grafanaAdminUser = monitoring.grafanaAdminUser;
 export const grafanaAdminPassword = monitoring.grafanaAdminPassword;
 export const prometheusPortForward =
