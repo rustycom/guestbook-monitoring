@@ -4,11 +4,17 @@ import { createProvider } from "./src/provider";
 import { createGuestbook } from "./src/guestbook";
 import { createMonitoring } from "./src/monitoring";
 import { createServiceMonitors } from "./src/servicemonitors";
+import { createEdge } from "./src/edge";
 
 const provider = createProvider(config);
 const guestbook = createGuestbook({ provider, config });
 const monitoring = createMonitoring({ provider, config });
 createServiceMonitors({ provider, namespace: guestbook.namespace, dependsOn: [monitoring.release] });
+const edge = createEdge({
+    provider, config, guestbookNamespace: guestbook.namespace, dependsOn: [monitoring.release],
+});
+
+export const guestbookUrl = edge.guestbookUrl;
 
 export const frontendClusterIp = guestbook.frontendService.spec.clusterIP;
 export const grafanaUrl = monitoring.grafanaUrl;

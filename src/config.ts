@@ -17,7 +17,7 @@ export const config = {
     nodeHost: c.get("nodeHost") ?? "localhost",
     // Don't wait for a LoadBalancer address (kind never assigns one).
     skipLbAwait: c.getBoolean("skipLbAwait") ?? false,
-    nodePorts: { grafana: 30300 },
+    nodePorts: { grafana: 30300, guestbook: 30080 },
     images: {
         // Upstream only publishes `latest`; pinned by digest.
         frontend:
@@ -31,6 +31,10 @@ export const config = {
         kubePrometheusStack: {
             repo: "https://prometheus-community.github.io/helm-charts",
             version: "92.14.1",
+        },
+        traefik: {
+            repo: "https://traefik.github.io/charts",
+            version: "42.1.3",
         },
     },
 };
