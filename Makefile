@@ -12,7 +12,7 @@ up: check-passphrase
 	npm ci --no-fund --no-audit
 	mkdir -p .pulumi-state
 	pulumi stack select --create dev
-	pulumi up --yes --skip-preview
+	pulumi up --yes --skip-preview --refresh
 
 verify: check-passphrase
 	./scripts/verify.sh

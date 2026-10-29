@@ -4,15 +4,15 @@ import { Config } from "./config";
 
 // Synthetic traffic through Traefik, so every dashboard panel has data on first open.
 // Per 7 s (14 ticks of 0.5 s): 14× GET /, ~3× read, ~1× write and 1× GET of a missing page,
-// i.e. ~5% deliberate 404s for the 4xx panel. The written value is fixed, so Redis memory
-// stays flat.
+// i.e. ~5% deliberate 404s for the 4xx panel. It uses its own Redis key (`loadgen`), so it never
+// overwrites messages typed into the guestbook UI, and the value is fixed so memory stays flat.
 const script = `
 target=http://traefik.traefik.svc.cluster.local
 i=0
 while true; do
   curl -s -o /dev/null "$target/"
-  [ $((i % 4)) -eq 0 ] && curl -s -o /dev/null "$target/guestbook.php?cmd=get&key=messages"
-  [ $((i % 20)) -eq 0 ] && curl -s -o /dev/null "$target/guestbook.php?cmd=set&key=messages&value=hello%2Cfrom%20loadgen"
+  [ $((i % 4)) -eq 0 ] && curl -s -o /dev/null "$target/guestbook.php?cmd=get&key=loadgen"
+  [ $((i % 20)) -eq 0 ] && curl -s -o /dev/null "$target/guestbook.php?cmd=set&key=loadgen&value=hello%2Cfrom%20loadgen"
   [ $((i % 14)) -eq 0 ] && curl -s -o /dev/null "$target/does-not-exist"
   i=$((i + 1))
   sleep 0.5

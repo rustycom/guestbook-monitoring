@@ -83,7 +83,7 @@ export function createMonitoring(args: { provider: k8s.Provider; config: Config 
         ? pulumi.output(`http://${cfg.nodeHost}:${cfg.nodePorts.grafana}`)
         : grafanaExternal.status.loadBalancer.ingress.apply(ing => {
             const addr = ing?.[0]?.ip ?? ing?.[0]?.hostname;
-            return addr ? `http://${addr}` : "pending — run: pulumi refresh";
+            return addr ? `http://${addr}` : "pending — run: pulumi up --refresh";
         });
 
     return {

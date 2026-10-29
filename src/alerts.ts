@@ -19,14 +19,19 @@ export function createAlerts(args: {
                 name: "guestbook",
                 rules: [
                     {
+                        // absent(): a Deployment scaled to zero has no target at all, so `up == 0`
+                        // alone would stay silent through a total outage.
                         alert: "GuestbookScrapeTargetDown",
-                        expr: `up{namespace="guestbook"} == 0`,
+                        expr: `up{namespace="guestbook"} == 0
+  or absent(up{namespace="guestbook",job="frontend"})
+  or absent(up{namespace="guestbook",job="redis-leader"})
+  or absent(up{namespace="guestbook",job="redis-replica"})`,
                         for: "2m",
                         labels: { severity: "warning" },
                         annotations: {
-                            summary: "Guestbook scrape target {{ $labels.job }}/{{ $labels.pod }} is down",
-                            description: "Prometheus has failed to scrape {{ $labels.instance }} for 2 minutes; its exporter or pod is unhealthy.",
-                            runbook_url: runbook("guestbookscrapetargetdown"),
+                            summary: "Guestbook scrape target {{ $labels.job }} is down or missing",
+                            description: "For 2 minutes Prometheus has either failed to scrape {{ $labels.job }} ({{ $labels.pod }}) or found no target for it at all; the exporter or the whole workload is unhealthy.",
+                            runbook: runbook("guestbookscrapetargetdown"),
                         },
                     },
                     {
@@ -38,7 +43,7 @@ export function createAlerts(args: {
                         annotations: {
                             summary: "Guestbook is answering more than 5% of requests with 5xx",
                             description: "5xx ratio at the Traefik edge is {{ $value | humanizePercentage }} over the last 5 minutes.",
-                            runbook_url: runbook("guestbookhigh5xxratio"),
+                            runbook: runbook("guestbookhigh5xxratio"),
                         },
                     },
                     {
@@ -49,7 +54,7 @@ export function createAlerts(args: {
                         annotations: {
                             summary: "Redis {{ $labels.service }} is down",
                             description: "redis_exporter in {{ $labels.pod }} cannot reach its Redis; guestbook reads or writes fail.",
-                            runbook_url: runbook("guestbookredisdown"),
+                            runbook: runbook("guestbookredisdown"),
                         },
                     },
                     {
@@ -63,7 +68,7 @@ export function createAlerts(args: {
                         annotations: {
                             summary: "Redis replication between leader and replica is broken",
                             description: "The replica is not connected to the leader; guestbook reads (served by the replica) are stale or failing.",
-                            runbook_url: runbook("guestbookredisreplicationbroken"),
+                            runbook: runbook("guestbookredisreplicationbroken"),
                         },
                     },
                 ],

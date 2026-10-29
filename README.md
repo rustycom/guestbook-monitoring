@@ -61,8 +61,9 @@ instrumenting the app, which would mean rebuilding the upstream image).
   ```
 
 No cloud account and no Pulumi Cloud login are needed: state lives in `./.pulumi-state`
-(gitignored). The Makefile points `PULUMI_BACKEND_URL` there. If you'd rather use Pulumi Cloud,
-`pulumi login` and drop that variable – nothing else changes.
+(gitignored). The Makefile points `PULUMI_BACKEND_URL` there unless it is already set, so for
+Pulumi Cloud just `export PULUMI_BACKEND_URL=https://api.pulumi.com` and `pulumi login` – nothing
+else changes.
 
 ## Deploy
 
@@ -168,12 +169,16 @@ One `PrometheusRule` (`guestbook/guestbook`, defined in [`src/alerts.ts`](src/al
 
 | Alert | Expression | For | Severity |
 |---|---|---|---|
-| GuestbookScrapeTargetDown | `up{namespace="guestbook"} == 0` | 2m | warning |
+| GuestbookScrapeTargetDown | `up{namespace="guestbook"} == 0` or a job's target is `absent()` | 2m | warning |
 | GuestbookHigh5xxRatio | edge 5xx ratio `> 0.05` | 5m | critical |
 | GuestbookRedisDown | `redis_up{namespace="guestbook"} == 0` | 1m | critical |
 | GuestbookRedisReplicationBroken | leader sees `< 1` replica **or** replica's `redis_master_link_up == 0` | 2m | warning |
 
 Under normal load all four are `inactive`.
+A Deployment scaled to zero has no scrape target at all, so `up == 0` can't see it, and Traefik
+counts its "no available server" 503s at the entrypoint rather than on the frontend service, so
+the 5xx ratio can't see it either. That's why `GuestbookScrapeTargetDown` also uses
+`absent(up{job=...})` for each of the three jobs.
 
 **Drill** (run during development):
 
@@ -186,25 +191,26 @@ kubectl --context kind-guestbook-monitoring -n guestbook scale deploy/redis-repl
 
 Scaling the replica to zero removes its scrape target entirely, so `up == 0` and the replica's
 own `redis_master_link_up` simply vanish rather than going to 0. That's why the replication
-alert also checks the leader side (`redis_connected_slaves < 1`).
+alert also checks the leader side (`redis_connected_slaves < 1`), and why
+`GuestbookScrapeTargetDown` (via `absent()`) fires in this drill too.
 
 #### guestbookscrapetargetdown
-An exporter or its pod is unhealthy. `kubectl -n guestbook get pods`; check the exporter
+An exporter or its pod is unhealthy. `kubectl --context kind-guestbook-monitoring -n guestbook get pods`; check the exporter
 container logs (`-c apache-exporter` / `-c redis-exporter`) and readiness. On the frontend, check
 that `curl localhost/server-status?auto` works inside the `frontend` container.
 
 #### guestbookhigh5xxratio
 Users are getting errors. Check the "Requests/s by status code" panel for when it started,
-`kubectl -n guestbook logs deploy/frontend -c frontend`, then Redis health (the PHP app returns
+`kubectl --context kind-guestbook-monitoring -n guestbook logs deploy/frontend -c frontend`, then Redis health (the PHP app returns
 errors when Redis is unreachable).
 
 #### guestbookredisdown
-Redis isn't answering its exporter. `kubectl -n guestbook describe pod -l app=redis-leader`
+Redis isn't answering its exporter. `kubectl --context kind-guestbook-monitoring -n guestbook describe pod -l app=redis-leader`
 (or `redis-replica`), check OOMKilled/restarts, `redis-cli ping` in the container.
 
 #### guestbookredisreplicationbroken
 Reads are served by the replica and will be stale or empty. Check the replica is running, then
-`kubectl -n guestbook exec deploy/redis-replica -c replica -- redis-cli info replication`
+`kubectl --context kind-guestbook-monitoring -n guestbook exec deploy/redis-replica -c replica -- redis-cli info replication`
 (`master_link_status`) and the replica logs for sync errors (see *Upstream issue found* below
 for the classic one).
 
@@ -235,7 +241,8 @@ pulumi stack output guestbookUrl
 ```
 
 Pulumi waits for the LoadBalancer addresses and puts them in the outputs. If an address isn't
-ready yet, the output says `pending — run: pulumi refresh`.
+ready yet, the output says `pending — run: pulumi up --refresh` (a plain `pulumi refresh` updates
+resource state but doesn't recompute stack outputs).
 
 ## Design decisions and trade-offs
 
@@ -251,7 +258,7 @@ ready yet, the output says `pending — run: pulumi refresh`.
 | Grafana exposure | Pulumi-owned `grafana-external` Service | Pulumi owns exposure and can output the address as a typed value; NodePort by default because `LoadBalancer` stays `<pending>` on kind. |
 | Grafana credentials | `RandomPassword` → Secret → `existingSecret`, secret output | No well-known default credentials on an exposed service. |
 | Dashboard | JSON file → ConfigMap → Grafana sidecar | Dashboard as code; stays an editable/exportable file. |
-| Traffic | In-cluster `loadgen` through Traefik, on by default | Dashboards have data the moment you open Grafana; ~5% deliberate 404s exercise the error panels. |
+| Traffic | In-cluster `loadgen` through Traefik, on by default | Dashboards have data the moment you open Grafana; ~5% deliberate 404s exercise the error panels. It writes its own Redis key (`loadgen`), so messages you add in the UI stay put. |
 | Namespaces | `guestbook`, `monitoring`, `traefik` | Upstream deploys to `default`; a small, documented divergence. |
 | State | Local file backend, stack `dev` | No Pulumi Cloud account required. |
 | Config | Project-level config in `Pulumi.yaml`; `Pulumi.dev.yaml` gitignored | The stack file carries an encryption salt bound to *your* passphrase, so committing it would break `make up` for anyone else. |

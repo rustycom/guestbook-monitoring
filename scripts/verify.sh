@@ -38,13 +38,16 @@ FAILED=0
 
 # 1. Pods Ready
 pods_ready() {
-  local bad
-  bad=$($K -n "$1" get pods -o json | jq -r '.items[]
+  local json bad n
+  json=$($K -n "$1" get pods -o json) || { echo "kubectl failed"; return 1; }
+  n=$(jq '.items | length' <<<"$json")
+  [ "$n" -gt 0 ] || { echo "no pods"; return 1; }
+  bad=$(jq -r '.items[]
     | select(.status.phase != "Succeeded")
     | select([.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length == 0)
-    | .metadata.name')
+    | .metadata.name' <<<"$json")
   [ -z "$bad" ] || { echo "not ready: $bad"; return 1; }
-  echo "$($K -n "$1" get pods --no-headers | wc -l | tr -d ' ') pods"
+  echo "$n pods"
 }
 for ns in guestbook monitoring traefik; do check "pods Ready in $ns" "" pods_ready "$ns"; done
 

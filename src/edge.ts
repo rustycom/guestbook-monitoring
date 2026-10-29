@@ -76,7 +76,7 @@ export function createEdge(args: {
         : k8s.core.v1.Service.get("traefik", pulumi.interpolate`${release.status.namespace}/${release.status.name}`, opts)
             .status.loadBalancer.ingress.apply(ing => {
                 const addr = ing?.[0]?.ip ?? ing?.[0]?.hostname;
-                return addr ? `http://${addr}` : "pending — run: pulumi refresh";
+                return addr ? `http://${addr}` : "pending — run: pulumi up --refresh";
             });
 
     return { release, guestbookUrl };
