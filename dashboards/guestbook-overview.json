@@ -116,7 +116,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -163,7 +163,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -230,7 +230,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -288,7 +288,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -459,8 +459,10 @@
           "unit": "percentunit",
           "custom": {
             "fillOpacity": 10,
-            "lineWidth": 1
-          }
+            "lineWidth": 1,
+            "axisSoftMax": 0.05
+          },
+          "min": 0
         },
         "overrides": []
       },
@@ -520,7 +522,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -695,7 +697,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -783,7 +785,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "redis_connected_clients{namespace=\"guestbook\"}",
+          "expr": "sum by (service) (redis_connected_clients{namespace=\"guestbook\"})",
           "legendFormat": "{{service}}",
           "range": true,
           "instant": false
@@ -833,7 +835,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "redis_memory_used_bytes{namespace=\"guestbook\"}",
+          "expr": "sum by (service) (redis_memory_used_bytes{namespace=\"guestbook\"})",
           "legendFormat": "{{service}}",
           "range": true,
           "instant": false
@@ -883,7 +885,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "redis_connected_slaves{namespace=\"guestbook\",service=\"redis-leader\"}",
+          "expr": "sum(redis_connected_slaves{namespace=\"guestbook\",service=\"redis-leader\"})",
           "legendFormat": "replicas connected to leader",
           "range": true,
           "instant": false
@@ -894,7 +896,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "redis_master_link_up{namespace=\"guestbook\",service=\"redis-replica\"}",
+          "expr": "min(redis_master_link_up{namespace=\"guestbook\",service=\"redis-replica\"})",
           "legendFormat": "replica link up",
           "range": true,
           "instant": false
@@ -932,7 +934,7 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "value_and_name"
+        "textMode": "auto"
       }
     },
     {
@@ -1052,7 +1054,7 @@
       "id": 22,
       "type": "stat",
       "title": "Restarts (1h)",
-      "description": "Source: cAdvisor / kube-state-metrics. Infrastructure resource telemetry about the guestbook pods — not application metrics.",
+      "description": "Container restarts in the last hour, per currently running pod. Source: cAdvisor / kube-state-metrics. Infrastructure resource telemetry about the guestbook pods — not application metrics.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1070,10 +1072,10 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"guestbook\"}[1h]))",
+          "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"guestbook\"}[1h])) and on (pod) (kube_pod_status_phase{namespace=\"guestbook\",phase=\"Running\"} == 1)",
           "legendFormat": "{{pod}}",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -1107,8 +1109,9 @@
           "values": false
         },
         "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "value_and_name"
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal"
       }
     }
   ]
