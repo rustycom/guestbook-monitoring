@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Acceptance test for the deployed stack. Prints a PASS/FAIL table; exits non-zero on any FAIL.
+# Right after a fresh `make up`, rates need a couple of scrapes before they exist, so failing
+# checks are retried every 15s for up to VERIFY_TIMEOUT seconds (default 300).
 # Needs PULUMI_CONFIG_PASSPHRASE (for the Grafana password output) and the Pulumi backend that
 # `make up` used (the Makefile exports PULUMI_BACKEND_URL).
 set -euo pipefail
@@ -16,8 +18,6 @@ PF=$!
 trap 'kill $PF 2>/dev/null || true' EXIT
 for _ in $(seq 1 30); do curl -sf "$PROM/-/ready" >/dev/null && break; sleep 1; done
 
-RESULTS=()
-FAILED=0
 record() { # record <PASS|FAIL> <check> <detail>
   RESULTS+=("$(printf '%-4s  %-46s %s' "$1" "$2" "$3")")
   [ "$1" = PASS ] || FAILED=1
@@ -31,6 +31,10 @@ series() { curl -s --get "$PROM/api/v1/query" --data-urlencode "query=$1" | jq '
 # Instant query → sum of all returned values (0 if empty).
 value() { curl -s --get "$PROM/api/v1/query" --data-urlencode "query=$1" | jq '[.data.result[].value[1] | tonumber] | add // 0'; }
 gt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
+
+run_checks() {
+RESULTS=()
+FAILED=0
 
 # 1. Pods Ready
 pods_ready() {
@@ -110,6 +114,15 @@ e2e() {
   echo "wrote $v, read back '$got'"; return 1
 }
 check "e2e write/read through guestbookUrl" "" e2e
+}
+
+deadline=$(( $(date +%s) + ${VERIFY_TIMEOUT:-300} ))
+attempt=1
+while run_checks; [ "$FAILED" -ne 0 ] && [ "$(date +%s)" -lt "$deadline" ]; do
+  echo "attempt $attempt: $(printf '%s\n' "${RESULTS[@]}" | grep -c '^FAIL') check(s) failing, retrying in 15s..."
+  attempt=$((attempt + 1))
+  sleep 15
+done
 
 printf '\n%-4s  %-46s %s\n' RES CHECK DETAIL
 printf '%s\n' "${RESULTS[@]}"

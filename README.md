@@ -127,6 +127,8 @@ sum by (code) (rate(traefik_service_requests_total{service=~".*frontend.*"}[1m])
 **c) `make verify`** checks pods, targets, exporter health, edge traffic, **every dashboard
 panel query** (read from the dashboard JSON, so the test can't drift from the dashboard),
 Grafana login and an end-to-end write → replicate → read through the edge.
+Straight after a fresh deploy it retries failing checks every 15 s for up to 5 minutes
+(`VERIFY_TIMEOUT`), since rates need a couple of scrapes before they exist.
 
 ### Why the Targets page is not empty (the #1 trap)
 
