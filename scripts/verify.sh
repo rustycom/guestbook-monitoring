@@ -13,6 +13,13 @@ PROM_PORT=${PROM_PORT:-19090}
 PROM="http://localhost:$PROM_PORT"
 DASHBOARD=dashboards/guestbook-overview.json
 
+# The operator creates Prometheus after the Helm release returns, and on a fresh cluster it takes
+# a few minutes to become Ready; don't spend the retry budget below on that.
+for _ in $(seq 1 60); do
+  $K -n monitoring wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus --timeout=5s >/dev/null 2>&1 && break
+  sleep 5
+done
+
 $K -n monitoring port-forward svc/kps-prometheus "$PROM_PORT:9090" >/dev/null 2>&1 &
 PF=$!
 trap 'kill $PF 2>/dev/null || true' EXIT
