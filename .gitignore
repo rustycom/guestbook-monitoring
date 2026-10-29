@@ -1,0 +1,6 @@
+.pulumi-state/
+node_modules/
+bin/
+*.log
+.env
+.superpowers/

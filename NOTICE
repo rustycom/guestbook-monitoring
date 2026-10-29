@@ -1,0 +1,5 @@
+This project is derived from the Pulumi examples repository:
+  https://github.com/pulumi/examples/tree/master/kubernetes-ts-guestbook/simple
+  (imported at commit aafefd573f799d998fd51b7dcf4a189847c904b0)
+Copyright 2016-2025, Pulumi Corporation. Licensed under the Apache License, Version 2.0
+(repository LICENSE; the example's package.json declares "MIT").
