@@ -29,7 +29,12 @@ export function createEdge(args: {
         skipAwait: skipWait,
         values: {
             service: { spec: { type: cfg.exposeAs } },
-            ports: { web: { nodePort: nodePort ? cfg.nodePorts.guestbook : null } },
+            ports: {
+                web: { nodePort: nodePort ? cfg.nodePorts.guestbook : null },
+                // No TLS here; not exposing websecure also avoids a random NodePort that could
+                // collide with Grafana's fixed 30300.
+                websecure: { expose: { default: false } },
+            },
             // publishedService copies the Traefik Service address onto Ingress status (LoadBalancer).
             providers: { kubernetesIngress: { enabled: true, publishedService: { enabled: true } } },
             metrics: {

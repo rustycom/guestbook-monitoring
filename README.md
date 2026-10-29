@@ -45,7 +45,7 @@ flowchart LR
 | **Native application metrics** | **None.** The PHP frontend and Redis expose no Prometheus endpoint. | – |
 | `apache_exporter` sidecar (frontend pods) | Apache `mod_status`: accesses/s, bytes, busy/idle workers, scoreboard, uptime, per pod | No HTTP status codes and no latency, so no error rate |
 | `redis_exporter` sidecar (leader + replica) | Redis `INFO`: commands/s, connected clients, memory, keys, replication link and connected replicas | Anything about the HTTP side |
-| Traefik edge (`traefik_service_*`) | Every request that reaches the guestbook: rate **by status code** and latency histogram | Per-pod breakdown (it sees the Service) |
+| Traefik edge (`traefik_service_*`) | Every request that reaches the guestbook: rate **by status code** and latency histogram | Per-pod breakdown (it sees the Service); app failures the PHP code still answers with HTTP 200 (e.g. Redis down) |
 | cAdvisor / kube-state-metrics | CPU, memory, restarts of the guestbook pods | **Infrastructure telemetry, not application metrics** – shown in its own clearly labelled dashboard row |
 
 Traefik is there because `mod_status` has no status codes: error rate needs an edge proxy (or
@@ -200,9 +200,11 @@ container logs (`-c apache-exporter` / `-c redis-exporter`) and readiness. On th
 that `curl localhost/server-status?auto` works inside the `frontend` container.
 
 #### guestbookhigh5xxratio
-Users are getting errors. Check the "Requests/s by status code" panel for when it started,
-`kubectl --context kind-guestbook-monitoring -n guestbook logs deploy/frontend -c frontend`, then Redis health (the PHP app returns
-errors when Redis is unreachable).
+Users are getting errors from Apache/PHP or Traefik. Check the "Requests/s by status code" panel
+for when it started and the frontend logs
+(`kubectl --context kind-guestbook-monitoring -n guestbook logs deploy/frontend -c frontend`).
+Note that a Redis outage does **not** show up here: the PHP app answers HTTP 200 with a PHP
+fatal-error body (see Known limitations), so check the Redis alerts and panels too.
 
 #### guestbookredisdown
 Redis isn't answering its exporter. `kubectl --context kind-guestbook-monitoring -n guestbook describe pod -l app=redis-leader`
@@ -291,6 +293,12 @@ replica run the same pinned `redis:8.10.3`, the replica with `--replicaof redis-
 - Single Redis leader, no Sentinel/failover. The replica only serves reads.
 - `pulumi/guestbook-php-redis` is published for `amd64` only. On Apple Silicon it runs under
   emulation; it works, but expect higher frontend latency/CPU than on amd64.
+- **Redis failures are invisible to the HTTP error rate.** With Redis unreachable, the 2018-era
+  PHP frontend returns **HTTP 200** whose body is `Fatal error: Uncaught exception
+  'Predis\Connection\ConnectionException'`. Traefik and Apache both count that as success.
+  Redis problems are caught by `GuestbookRedisDown`, `GuestbookRedisReplicationBroken` and
+  `GuestbookScrapeTargetDown` instead. Fixing it properly means changing the app (return 5xx) or
+  adding a synthetic probe that checks the response body (e.g. blackbox_exporter).
 - Loadgen traffic is synthetic and uniform: good for proving the pipeline, not for capacity numbers.
 - The Ingress has no published address under NodePort (`pulumi.com/skipAwait` is set so Pulumi
   doesn't wait for one). With `exposeAs=LoadBalancer` Traefik publishes the LB address on it.
