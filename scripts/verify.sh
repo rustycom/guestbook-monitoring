@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Acceptance test for the deployed stack. Prints a PASS/FAIL table; exits non-zero on any FAIL.
-# Right after a fresh `make up`, rates need a couple of scrapes before they exist, so failing
-# checks are retried every 15s for up to VERIFY_TIMEOUT seconds (default 300).
+# Right after a fresh `make up`, Prometheus first has to load the new ServiceMonitors and then
+# scrape a couple of times before rates exist (~2-3 min on a laptop), so failing checks are
+# retried every 15s for up to VERIFY_TIMEOUT seconds (default 600).
 # Needs PULUMI_CONFIG_PASSPHRASE (for the Grafana password output) and the Pulumi backend that
 # `make up` used (the Makefile exports PULUMI_BACKEND_URL).
 set -euo pipefail
@@ -114,10 +115,12 @@ check "grafana dashboard guestbook-overview" "" grafana_dashboard
 # 7. End-to-end write → replicate → read through the edge. Own key, so loadgen can't overwrite it.
 GUESTBOOK_URL=$(pulumi stack output guestbookUrl)
 e2e() {
-  local v="verify-$(date +%s)" got
+  local v="verify-$(date +%s)" got body
   curl -sf "$GUESTBOOK_URL/guestbook.php?cmd=set&key=verify&value=$v" >/dev/null
   for _ in $(seq 1 10); do
-    got=$(curl -sf "$GUESTBOOK_URL/guestbook.php?cmd=get&key=verify" | jq -r .data)
+    body=$(curl -s "$GUESTBOOK_URL/guestbook.php?cmd=get&key=verify")
+    # The PHP app answers a Redis failure with HTTP 200 and an HTML fatal error, not JSON.
+    got=$(jq -r .data <<<"$body" 2>/dev/null) || got="non-JSON response: $(tr -s ' \n' ' ' <<<"$body" | cut -c1-100)"
     [ "$got" = "$v" ] && { echo "wrote+read $v via $GUESTBOOK_URL"; return 0; }
     sleep 1
   done
@@ -126,10 +129,11 @@ e2e() {
 check "e2e write/read through guestbookUrl" "" e2e
 }
 
-deadline=$(( $(date +%s) + ${VERIFY_TIMEOUT:-300} ))
+deadline=$(( $(date +%s) + ${VERIFY_TIMEOUT:-600} ))
 attempt=1
 while run_checks; [ "$FAILED" -ne 0 ] && [ "$(date +%s)" -lt "$deadline" ]; do
-  echo "attempt $attempt: $(printf '%s\n' "${RESULTS[@]}" | grep -c '^FAIL') check(s) failing, retrying in 15s..."
+  failing=$(printf '%s\n' "${RESULTS[@]}" | awk '/^FAIL/ { sub(/^FAIL +/, ""); sub(/ {2,}.*/, ""); print }')
+  echo "attempt $attempt: $(grep -c . <<<"$failing") failing ($(head -3 <<<"$failing" | paste -sd ',' -)...), retrying in 15s"
   attempt=$((attempt + 1))
   sleep 15
 done
