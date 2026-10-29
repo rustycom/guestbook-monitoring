@@ -5,6 +5,7 @@ import { createGuestbook } from "./src/guestbook";
 import { createMonitoring } from "./src/monitoring";
 import { createServiceMonitors } from "./src/servicemonitors";
 import { createEdge } from "./src/edge";
+import { createLoadgen } from "./src/loadgen";
 
 const provider = createProvider(config);
 const guestbook = createGuestbook({ provider, config });
@@ -13,6 +14,7 @@ createServiceMonitors({ provider, namespace: guestbook.namespace, dependsOn: [mo
 const edge = createEdge({
     provider, config, guestbookNamespace: guestbook.namespace, dependsOn: [monitoring.release],
 });
+createLoadgen({ provider, config, namespace: guestbook.namespace, dependsOn: [edge.release] });
 
 export const guestbookUrl = edge.guestbookUrl;
 

@@ -17,6 +17,8 @@ export const config = {
     nodeHost: c.get("nodeHost") ?? "localhost",
     // Don't wait for a LoadBalancer address (kind never assigns one).
     skipLbAwait: c.getBoolean("skipLbAwait") ?? false,
+    // In-cluster synthetic traffic so dashboards have data. `pulumi config set --path loadgen.enabled false`.
+    loadgen: { enabled: c.getObject<{ enabled?: boolean }>("loadgen")?.enabled ?? true },
     nodePorts: { grafana: 30300, guestbook: 30080 },
     images: {
         // Upstream only publishes `latest`; pinned by digest.
@@ -26,6 +28,7 @@ export const config = {
         redis: "redis:8.10.3",
         apacheExporter: "lusotycoon/apache-exporter:v1.1.1",
         redisExporter: "oliver006/redis_exporter:v1.96.0",
+        curl: "curlimages/curl:8.23.0",
     },
     charts: {
         kubePrometheusStack: {
