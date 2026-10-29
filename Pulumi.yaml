@@ -1,8 +1,15 @@
-name: guestbook
+name: guestbook-monitoring
 runtime: nodejs
-description: Kubernetes Guestbook example based on https://kubernetes.io/docs/tutorials/stateless-application/guestbook/
-template:
-  config:
-    isMinikube:
-      description: Whether you are deploying to minikube
-      default: true
+description: Kubernetes Guestbook (pulumi/examples) extended with Prometheus + Grafana monitoring
+# Non-secret configuration lives here (project level) rather than in Pulumi.dev.yaml, because the
+# stack file also carries the passphrase-bound encryption salt and so cannot be shared.
+# Override per stack with `pulumi config set <key> <value>`.
+config:
+  kubeContext:
+    type: string
+    description: Kube context to deploy to. Always explicit; the ambient current-context is never used.
+    default: kind-guestbook-monitoring
+  frontendServiceType:
+    type: string
+    description: Service type of the guestbook frontend (traffic enters via Traefik, so ClusterIP).
+    default: ClusterIP

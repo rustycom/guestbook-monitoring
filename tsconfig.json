@@ -15,7 +15,8 @@
         "noImplicitReturns": true,
         "skipLibCheck": true
     },
-    "files": [
-        "index.ts"
+    "include": [
+        "index.ts",
+        "src/**/*.ts"
     ]
 }
